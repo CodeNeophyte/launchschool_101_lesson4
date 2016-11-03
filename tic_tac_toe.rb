@@ -37,9 +37,7 @@ def display_scores(player, computer, tie)
 end
 
 # rubocop:disable Metrics/AbcSize
-def display_board(brd, player, computer, tie, round, winner)
-  clear_screen
-  display_scores(player, computer, tie)
+def create_board(brd)
   puts ""
   puts "     |     |"
   puts "  #{brd[1]}  |  #{brd[2]}  |  #{brd[3]}"
@@ -53,9 +51,15 @@ def display_board(brd, player, computer, tie, round, winner)
   puts "  #{brd[7]}  |  #{brd[8]}  |  #{brd[9]}"
   puts "     |     |"
   puts ""
-  display_round_winner(winner, round)
 end
 # rubocop:enable Metrics/AbcSize
+
+def display_board(brd, player, computer, tie, round, winner)
+  clear_screen
+  display_scores(player, computer, tie)
+  create_board(brd)
+  display_round_winner(winner, round)
+end
 
 def initialize_board
   new_board = {}
@@ -162,6 +166,7 @@ end
 def first_player(num_games, winner)
   answer = ''
   if num_games.zero?
+    clear_screen
     loop do
       puts "Choose first player: Player or Computer"
       answer = gets.chomp.capitalize
