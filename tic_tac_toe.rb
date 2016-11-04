@@ -54,11 +54,10 @@ def create_board(brd)
 end
 # rubocop:enable Metrics/AbcSize
 
-def display_board(brd, player, computer, tie, round, winner)
+def display_board(brd, player, computer, tie)
   clear_screen
   display_scores(player, computer, tie)
   create_board(brd)
-  display_round_winner(winner, round)
 end
 
 def initialize_board
@@ -87,14 +86,10 @@ def player_places_piece!(brd)
   brd[square] = PLAYER_MARKER
 end
 
-def detect_two(brd, marker1, marker2)
+def detect_two(brd, marker)
   WINNING_LINES.each do |line|
-    if brd.values_at(*line).count(marker1) == 2 &&
-       brd.values_at(*line).count(marker2) == 1 # ignores sets where
-      # the player already filled the third square
-      next
-    elsif brd.values_at(*line).count(marker1) == 2 &&
-          brd.values_at(*line).count(marker2).zero?
+    if brd.values_at(*line).count(marker) == 2 &&
+       brd.values_at(*line).count(INITIAL_MARKER) == 1
       return line
     end
   end
@@ -102,28 +97,23 @@ def detect_two(brd, marker1, marker2)
 end
 
 def select_empty_space(brd, array) # selects the empty space after detect two
-  array.each do |num|
-    if brd[num] != INITIAL_MARKER
-      next
-    else
-      return num
-    end
+  array.find do |num|
+    brd[num] == INITIAL_MARKER
   end
 end
 
 def pick_five_or_empty(brd)
-  selection = 0
-  if brd[5] == INITIAL_MARKER
-    selection = 5
-  else
-    selection = empty_squares(brd).sample
-  end
+  selection = if brd[5] == INITIAL_MARKER
+                5
+              else
+                empty_squares(brd).sample
+              end
   selection
 end
 
 def computer_places_piece!(brd) # offensive first, then defensive
-  offensive_opportunities = detect_two(brd, COMPUTER_MARKER, PLAYER_MARKER)
-  defensive_opportunities = detect_two(brd, PLAYER_MARKER, COMPUTER_MARKER)
+  offensive_opportunities = detect_two(brd, COMPUTER_MARKER)
+  defensive_opportunities = detect_two(brd, PLAYER_MARKER)
   if !offensive_opportunities.empty?
     square = select_empty_space(brd, offensive_opportunities)
   elsif offensive_opportunities.empty?
@@ -174,13 +164,13 @@ def first_player(num_games, winner)
       puts "Invalid entry. Try again!"
     end
   else
-    winner == "Player" ? answer = "Computer" : answer = "Player"
+    answer = winner == "Player" ? "Computer" : "Player"
   end
   answer
 end
 
 def alternate_player(cur_player)
-  cur_player = cur_player == "Player" ? "Computer" : "Player"
+  cur_player == "Player" ? "Computer" : "Player"
 end
 
 # Main logic
@@ -196,14 +186,13 @@ loop do # Main loop
     board = initialize_board # self-explanatory
 
     loop do # Play loop
-      display_board(board, player_score, computer_score, tie_score, round,
-                    winner)
+      display_board(board, player_score, computer_score, tie_score)
       place_piece!(board, current_player)
       current_player = alternate_player(current_player)
       break if someone_won?(board) || board_full?(board)
     end
 
-    display_board(board, player_score, computer_score, tie_score, round, winner)
+    display_board(board, player_score, computer_score, tie_score)
 
     if someone_won?(board)
       winner = detect_winner(board)
@@ -213,7 +202,8 @@ loop do # Main loop
       tie_score += 1
     end
     round += 1
-    display_board(board, player_score, computer_score, tie_score, round, winner)
+    display_board(board, player_score, computer_score, tie_score)
+    display_round_winner(winner, round)
     sleep(2)
     break if player_score == 5 || computer_score == 5
   end
