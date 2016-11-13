@@ -1,0 +1,6 @@
+# twenty-one.yml
+
+welcome: "Welcome to twenty-one!"
+objective: "The objective of the game is to get as close to 21 but not over it."
+game: "You will be playing the computer as the dealer. The first to win five
+      rounds, wins the game!"

@@ -1,11 +1,13 @@
+# requires
 require 'pry'
+require 'yaml'
+
 # variables
 SUITS = ["Hearts", "Diamonds", "Clubs", "Spades"].freeze
 CARDS = [2, 3, 4, 5, 6, 7, 8, 9, 10, "jack", "queen", "king", "ace"].freeze
-player_score = 0
-dealer_score = 0
-tie_score = 0
-winner = ''
+GAME_LIMIT = 21
+DEALER_LIMIT = 17
+MESSAGES = YAML.load_file('twenty-one.yml')
 round = 0
 
 # methods
@@ -13,14 +15,12 @@ def prompt(msg)
   puts "=> #{msg}"
 end
 
+def messages(message)
+  MESSAGES[message]
+end
+
 def initialize_deck
-  temp_deck = []
-  SUITS.each do |suit|
-    CARDS.each do |card|
-      temp_deck << [suit, card]
-    end
-  end
-  temp_deck
+  SUITS.product(CARDS).shuffle!
 end
 
 def clear_screen
@@ -28,7 +28,7 @@ def clear_screen
 end
 
 def deal_card(receiver, deck)
-  receiver << deck.shuffle!.pop
+  receiver << deck.pop
 end
 
 def initial_deal(receiver, deck)
@@ -39,11 +39,11 @@ end
 
 def ace?(total, aces)
   aces.times do
-    total = if total <= 10
-              total += 11
-            else
-              total += 1
-            end
+    total += if total <= (GAME_LIMIT - 11)
+               11
+             else
+               1
+             end
   end
   total
 end
@@ -64,20 +64,25 @@ def calculate_total_value(hand)
 end
 
 def bust?(total)
-  total > 21
+  total > GAME_LIMIT
 end
 
 def player_turn(hand, deck)
-  puts "hit or stay?"
-  answer = gets.chomp.downcase
-  return answer if answer == "stay"
+  answer = ''
+  loop do
+    puts "(h)it or (s)tay?"
+    answer = gets.chomp.downcase
+    break if ['h', 's'].include?(answer)
+    prompt("Incorrect value! Try again.")
+  end
+  return answer if answer == "s"
   deal_card(hand, deck)
 end
 
 def dealer_turn(hand, deck)
   loop do
     total = calculate_total_value(hand)
-    break if total >= 17 || bust?(total)
+    break if total >= DEALER_LIMIT || bust?(total)
     deal_card(hand, deck)
   end
 end
@@ -97,8 +102,13 @@ def display_player_hand(hand)
 end
 
 def display_dealer_hand(hand)
-  add_cards = "#{hand.length - 1} additional cards"
+  add_cards = if hand.length == 2
+                "#{hand.length - 1} additional card"
+              else
+                "#{hand.length - 1} additional cards"
+              end
   "Dealer hand: #{hand[0][1]} of #{hand[0][0]} and #{add_cards}"
+  # binding.pry
 end
 
 def display_scores(player, dealer, tie, rounds, pscore, dscore)
@@ -107,11 +117,11 @@ def display_scores(player, dealer, tie, rounds, pscore, dscore)
   puts display_player_hand(player)
   puts display_dealer_hand(dealer)
   puts "Player score: #{pscore}; Dealer score: #{dscore}; Ties #{tie}"
-  puts "Number of games played: #{rounds}"
+  puts "Number of rounds played: #{rounds}"
   puts "-" * 60
 end
 
-def winner?(player, dealer)
+def who_won(player, dealer)
   if player > dealer
     "Player"
   elsif player == dealer
@@ -121,55 +131,31 @@ def winner?(player, dealer)
   end
 end
 
-# Game logic
-clear_screen
-puts "Welcome to twenty-one!"
-sleep(2)
-loop do # main logic loop
-  # clear_screen
-  dealer_hand = []
-  player_hand = []
-  loop do
-    new_deck = initialize_deck
-    initial_deal(player_hand, new_deck)
-    initial_deal(dealer_hand, new_deck)
-    display_scores(player_hand, dealer_hand, tie_score, round, player_score,
-                   dealer_score)
-    loop do
-      answer = player_turn(player_hand, new_deck)
-      display_scores(player_hand, dealer_hand, tie_score, round, player_score,
-                     dealer_score)
-      total = calculate_total_value(player_hand)
-      break if answer == "stay" || bust?(total)
-    end
-    player_total = calculate_total_value(player_hand)
-    if bust?(player_total)
-      winner = "Dealer"
-      prompt "Player busted!"
-      sleep(2)
-      break
-    end
-    dealer_turn(dealer_hand, new_deck)
-    display_scores(player_hand, dealer_hand, tie_score, round, player_score,
-                   dealer_score)
-    dealer_total = calculate_total_value(dealer_hand)
-    if bust?(dealer_total)
-      winner = "Player"
-      prompt "Dealer busted!"
-      sleep(2)
-      break
-    end
-    winner = winner?(player_total, dealer_total)
-    break unless winner.empty?
-  end
-  display_scores(player_hand, dealer_hand, tie_score, round, player_score,
-                 dealer_score)
+def show_dealer_deck(hand, total)
+  hand_string = translate_hand(hand)
+  puts "Dealer hand: #{hand_string}; current total: #{total}"
+end
+
+def display_winner(winner, dealer_hand, total)
   if winner == "Tie"
     prompt "Its a tie!"
   else
     prompt "#{winner} won!"
+    show_dealer_deck(dealer_hand, total)
   end
-  sleep(2)
+end
+
+def play_again?
+  loop do
+    prompt "Play again? (y or n)"
+    answer = gets.chomp.downcase
+    break if ['y', 'n'].include?(answer)
+    prompt "Invalid entry! Try again."
+  end
+  answer.downcase.start_with?('y')
+end
+
+def update_scores(player_score, dealer_score, tie_score, round, winner)
   if winner == "Player"
     player_score += 1
   elsif winner == "Dealer"
@@ -178,10 +164,77 @@ loop do # main logic loop
     tie_score += 1
   end
   round += 1
+  return player_score, dealer_score, tie_score, round
+end
+
+# Game logic
+clear_screen
+prompt(messages('welcome'))
+prompt(messages('objective'))
+prompt(messages('game'))
+sleep(4)
+loop do # main logic loop, game starts
+  player_card_total = 0
+  dealer_card_total = 0
+  player_score = 0
+  dealer_score = 0
+  tie_score = 0
+  winner = ''
+  dealer_hand = []
+  player_hand = []
+  loop do # start of round
+    break if player_score == 5 || dealer_score == 5
+    dealer_hand = [] # initialize
+    player_hand = [] # initialize
+    new_deck = initialize_deck
+    initial_deal(player_hand, new_deck)
+    initial_deal(dealer_hand, new_deck)
+    display_scores(player_hand, dealer_hand, tie_score, round, player_score,
+                   dealer_score)
+    loop do # player turn
+      answer = player_turn(player_hand, new_deck)
+      display_scores(player_hand, dealer_hand, tie_score, round, player_score,
+                     dealer_score)
+      player_card_total = calculate_total_value(player_hand)
+      break if answer == "s" || bust?(player_card_total)
+    end
+    if bust?(player_card_total)
+      winner = "Dealer"
+      prompt "Player busted!"
+      dealer_card_total = calculate_total_value(dealer_hand)
+      dealer_score += 1
+      round += 1
+      display_winner(winner, dealer_hand, dealer_card_total)
+      sleep(4)
+      next
+    end # player turn ends
+    # dealer turn starts
+    dealer_turn(dealer_hand, new_deck)
+    display_scores(player_hand, dealer_hand, tie_score, round, player_score,
+                   dealer_score)
+    dealer_card_total = calculate_total_value(dealer_hand)
+    if bust?(dealer_card_total)
+      winner = "Player"
+      prompt "Dealer busted!"
+      player_score += 1
+      round += 1
+      display_winner(winner, dealer_hand, dealer_card_total)
+      sleep(4)
+      next
+    end # dealer turn ends
+    winner = who_won(player_card_total, dealer_card_total)
+    display_scores(player_hand, dealer_hand, tie_score, round, player_score,
+                   dealer_score)
+    display_winner(winner, dealer_hand, dealer_card_total)
+    sleep(4)
+    player_score, dealer_score, tie_score, round = update_scores(player_score,
+                                                                 dealer_score,
+                                                                 tie_score,
+                                                                 round, winner)
+  end # end of round
   display_scores(player_hand, dealer_hand, tie_score, round, player_score,
                  dealer_score)
-  prompt "Play again? (y or n)"
-  answer = gets.chomp
-  break unless answer.downcase.start_with?('y')
-end
+  puts player_score == 5 ? "Player won the game!" : "Dealer won the game!"
+  break unless play_again?
+end # end game
 puts "Thank you for playing twenty-one!"
