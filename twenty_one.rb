@@ -52,7 +52,7 @@ def calculate_total_value(hand)
   total = 0
   aces = 0
   hand.each do |_suit, value|
-    if value.class == Fixnum
+    if value.is_a? Integer
       total += value
     elsif value == "ace"
       aces += 1
@@ -146,13 +146,14 @@ def display_winner(winner, dealer_hand, total)
 end
 
 def play_again?
+  answer = ''
   loop do
     prompt "Play again? (y or n)"
     answer = gets.chomp.downcase
     break if ['y', 'n'].include?(answer)
     prompt "Invalid entry! Try again."
   end
-  answer.downcase.start_with?('y')
+  answer.start_with?('y')
 end
 
 def update_scores(player_score, dealer_score, tie_score, round, winner)
@@ -164,7 +165,7 @@ def update_scores(player_score, dealer_score, tie_score, round, winner)
     tie_score += 1
   end
   round += 1
-  return player_score, dealer_score, tie_score, round
+  [player_score, dealer_score, tie_score, round]
 end
 
 # Game logic
